@@ -2,6 +2,10 @@
 
 [add note about source here] """
 
+import os
+from hashlib import sha1
+from datetime import datetime
+
 from sqlalchemy import Table, ForeignKey, Column
 from sqlalchemy.types import String, Unicode, UnicodeText, Integer, DateTime,\
                              Boolean, Float
