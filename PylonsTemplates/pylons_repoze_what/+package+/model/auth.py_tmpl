@@ -1,6 +1,8 @@
-""" Stock authorization model suitable for repoze.what-quickstart.
+""" Sample SQLAlchemy-powered model definition for the repoze.what SQL plugin.
 
-[add note about source here] """
+From published Pylons + repoze.what example:
+http://wiki.pylonshq.com/display/pylonscookbook/Authorization+with+repoze.what
+"""
 
 import os
 from hashlib import sha1
