@@ -1,0 +1,33 @@
+
+<!-- Edit this template file with your page layout/inheritance. -->
+
+{{if template_engine == 'mako'}}
+<form action="${url('/login_handler', came_from=c.came_from, __logins=c.login_counter)}" method="POST">
+{{elif template_engine == 'genshi'}}
+<html xmlns:py="http://genshi.edgewall.org/">
+  <head>
+    <title>Title</title>
+  </head>
+  <body>
+
+<form py:attrs="{'action':url('/login_handler', came_from=c.came_from, __logins=c.login_counter)}" method="POST">
+{{elif template_engine == 'jinja2'}}
+<form action="{{start_braces}} url('/login_handler', came_from=c.came_from, __logins=c.login_counter) {{end_braces}}" method="POST">
+{{else}}
+<!-- Replace this Mako syntax with the correct syntax for your template
+     engine. -->
+<form action="${url('/login_handler', came_from=c.came_from, __logins=c.login_counter)}" method="POST">
+{{endif}}
+    <label for="login">Username:</label>
+    <input type="text" id="login" name="login" /><br/>
+    
+    <label for="password">Password:</label>
+    <input type="password" id="password" name="password" /><br/>
+    
+    <input type="submit" value="Login" />
+</form>
+
+{{if template_engine == 'genshi'}}
+   </body>
+</html>
+{{endif}}

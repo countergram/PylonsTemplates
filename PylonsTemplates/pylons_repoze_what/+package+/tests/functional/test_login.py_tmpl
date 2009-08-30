@@ -1,0 +1,13 @@
+from {{ package }}.tests import *
+
+class TestFooController(TestController):
+
+    def test_login(self):
+        response = self.app.get(url(controller='login', action='login'))
+        self.assertEqual(response.status_int, 200)
+        assert '<form' in response
+        
+    def test_post_logout(self):
+        response = self.app.get(url(controller='login', action='post_logout'))
+        self.assertEqual(response.status_int, 200)
+        
