@@ -1,13 +1,132 @@
-from {{ package }}.tests import *
+from repoze.what.predicates import has_permission
+from repoze.what.plugins.pylonshq import ActionProtector
+from pylons import url
+from pylons import config
+
+from {{package}}.tests import *
+from {{package}}.model.auth import group_permission_table, user_group_table
+from {{package}}.model import meta, User, Group, Permission
+from {{package}}.controllers.login import LoginController
 
 class TestFooController(TestController):
 
-    def test_login(self):
+    tables = [
+           User.__table__,
+           Group.__table__,
+           Permission.__table__,
+           group_permission_table,
+           user_group_table,
+           ]
+        
+    def setUp(self):
+        meta.metadata.create_all(bind=meta.engine, checkfirst=True)
+        for table in self.tables:
+            # Should be run in a test database, so no problem deleting to 
+            # make way for fixtures
+            table.delete(bind=meta.engine).execute()
+
+        user1 = User()
+        user1.user_name = 'user1'
+        user1.password = '1234'
+        meta.Session.save(user1)
+        
+        members = Group()
+        members.group_name = 'members'
+        meta.Session.save(members)
+        members.users = [user1]
+        
+        be_cool = Permission()
+        be_cool.permission_name = 'be_cool'
+        meta.Session.save(be_cool)
+        members.permissions = [be_cool]
+        meta.Session.commit()
+
+        # Dynamically add a sample restricted page to login controller to test
+        @ActionProtector(has_permission(u'be_cool'))
+        def sample(self):
+            return "Granted"
+        LoginController.sample = sample
+        
+        @ActionProtector(has_permission(u'other_perm'))
+        def sample2(self):
+            return "Granted"
+        LoginController.sample2 = sample2
+
+    def tearDown(self):
+         for table in self.tables:
+             # Should be run in a test database, so no problem deleting to 
+             # make way for fixtures
+             table.delete(bind=meta.engine).execute()
+            
+    #
+    # Tests
+    #    
+     
+    def test_user_present(self):
+        users = meta.Session.query(User).all()
+        self.assertNotEqual(users, [])
+        
+    def test_login_page(self):
+        """ Login page must display """
+        self.app.reset()
         response = self.app.get(url(controller='login', action='login'))
         self.assertEqual(response.status_int, 200)
         assert '<form' in response
-        
-    def test_post_logout(self):
+    
+    def test_post_logout_page(self):
+        """ Post-logout page must display """
         response = self.app.get(url(controller='login', action='post_logout'))
         self.assertEqual(response.status_int, 200)
+            
+    def test_login_handler(self):
+        """ Posting correct credentials to login page must result in redirect
+        to post_login page, which will have repoze.who.identity in environ. """
+        self.app.reset()
+        response = self.app.get(url(controller='login', action='login'), status=200)
+        form = response.form
+        assert form
+        form['login'] = u'user1'
+        form['password'] = u'1234'
+        response_to_login = form.submit(status=302)
+        response_post_login = response_to_login.follow(status=302)
+        assert response_post_login.req.environ.get('repoze.who.identity')
+        
+    def test_login_handler_bad_login(self):
+        """ Posting incorrect credentials to login page must result in 
+        redirect """
+        self.app.reset()
+        response = self.app.get(url(controller='login', action='login'), status=200)
+        form = response.form
+        assert form
+        form['login'] = u'badname'
+        form['password'] = u'badpassword'
+        response_to_login = form.submit(status=302)
+        response_post_login = response_to_login.follow(status=302)
+        self.assertEquals(None, response_post_login.req.environ.get('repoze.who.identity'))
+            
+    def test_user_not_logged_in(self):
+        """ Not-logged-in user accessing secured resource must be redirected
+        to the login page. """
+        self.app.reset()
+        response = self.app.get(url(controller='login', action='sample'), status=302)
+        response_login_form = response.follow(status=200)
+        environ = response_login_form.req.environ
+        assert 'repoze.who.logins' in environ
+        self.assertEqual(environ['pylons.routes_dict']['action'], u'login')
+        
+    def test_user_with_permission(self):
+        self.app.reset()
+        login_response = self.app.post(url('/login_handler'), {'login':u'user1', 'password':u'1234'})
+        page_response = self.app.get(url(controller='login', action='sample'))
+        
+    def test_user_without_permission(self):
+        """ Logged-in user without permission must be given 403 response. """
+        self.test_login_handler()
+        response_page = self.app.get(url(controller='login', action='sample2'), status=403)
+
+    def test_logout(self):
+        """ User who visits logout URL must be logged out. """
+        self.test_login_handler()
+        response_logout = self.app.get(url('/logout'), status=302)
+        self.test_user_not_logged_in()
         
