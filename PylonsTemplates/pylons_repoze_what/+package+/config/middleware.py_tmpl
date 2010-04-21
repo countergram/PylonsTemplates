@@ -1,5 +1,4 @@
 """Pylons middleware initialization"""
-from logging import INFO
 from beaker.middleware import CacheMiddleware, SessionMiddleware
 from paste.cascade import Cascade
 from paste.registry import RegistryManager
@@ -52,11 +51,13 @@ def make_app(global_conf, full_stack=True, static_files=True, **app_conf):
 
     if asbool(full_stack):
         # repoze.what authentication
+        repoze_log_level = config.get('logger_repoze.level',
+            config.get('logger_root.level', 'info')).lower()
         app = setup_sql_auth(app, User, Group, Permission, meta.Session,
             logout_handler='/logout',
             post_login_url='/post_login',
             post_logout_url='/post_logout',
-            log_level=INFO,
+            log_level=repoze_log_level,
             skip_authentication=config.get('skip_authentication', False))
         
         # Handle Python exceptions
